@@ -1,0 +1,15 @@
+FROM alpine:latest
+
+RUN apk add --no-cache python3 dumb-init
+COPY requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
+
+COPY lagerist.py /app
+WORKDIR /app
+
+VOLUME ["/proc", "/sys"]
+EXPOSE 9165
+ENTRYPOINT ["dumb-init", "--"]
+CMD [ "python3", "lagerist.py" ]
+
+# run using: docker run --rm -it -v /proc:/proc:ro /dev:/dev:ro /sys:/sys lagerist

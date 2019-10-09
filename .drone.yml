@@ -1,0 +1,16 @@
+kind: pipeline
+name: default
+
+steps:
+- name: build python version
+  image: plugins/docker
+  settings:
+    repo: docker.funzt-halt.net/lagerist
+    tags: python
+    dockerfile: Dockerfile.python
+    cache_from: docker.funzt-halt.net/lagerist:python
+  when:
+    branch: master
+    event:
+      exclude:
+      - pull_request
