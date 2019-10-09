@@ -129,6 +129,9 @@ async def ktrace():
                     # We probably haven't observed the insertion/issuance event because we weren't around back then
                     continue
 
+                del insertion[key]
+                del issuance[key]
+
                 total_time = queue_time + disk_time
 
                 histograms[0].labels(device=dev_path, optype=optype).observe(queue_time)
