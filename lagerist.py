@@ -77,7 +77,12 @@ async def ktrace():
             while not parts[1].startswith("["):
                 parts.pop(0)
 
-            time = float(parts[3].rstrip(":"))
+            try:
+                time = float(parts[3].rstrip(":"))
+            except ValueError:
+                print("Something's off about this line:", line)
+                continue
+
             op   = parts[4].rstrip(":")
             dev  = parts[5]
             rwbs = parts[6]
