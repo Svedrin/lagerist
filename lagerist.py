@@ -82,6 +82,10 @@ async def ktrace():
             dev  = parts[5]
             rwbs = parts[6]
 
+            if dev == "0,0":
+                # wtf
+                continue
+
             if "R" in rwbs:
                 optype = "read"
             elif "W" in rwbs:
