@@ -183,16 +183,16 @@ def main():
         trio.run(async_main)
     except KeyboardInterrupt:
         pass
+    finally:
+        # Tear down ktrace
+        #
+        # echo 0 > "$INST/tracing_on"
+        # rmdir "$INST"
 
-    # Tear down ktrace
-    #
-    # echo 0 > "$INST/tracing_on"
-    # rmdir "$INST"
+        with open(os.path.join(inst_dir, "tracing_on"), "wb") as fd:
+            fd.write(b"0")
 
-    with open(os.path.join(inst_dir, "tracing_on"), "wb") as fd:
-        fd.write(b"0")
-
-    os.rmdir(inst_dir)
+        os.rmdir(inst_dir)
 
 
 if __name__ == '__main__':
