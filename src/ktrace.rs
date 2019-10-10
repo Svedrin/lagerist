@@ -1,4 +1,4 @@
-use std::fs::{File,create_dir,remove_dir,OpenOptions};
+use std::fs::{create_dir,remove_dir,OpenOptions};
 use std::io::prelude::*;
 use super::errors::{Result, ResultExt};
 
@@ -37,6 +37,10 @@ pub fn setup() -> Result<()> {
     echo_into(b"1", &format!("{}/events/block/block_rq_complete/enable", &instance_path))?;
     echo_into(b"1", &format!("{}/tracing_on", &instance_path))?;
     Ok(())
+}
+
+pub fn socket_path() -> String {
+    format!("/sys/kernel/debug/tracing/instances/{}/trace_pipe", env!("CARGO_PKG_NAME"))
 }
 
 pub fn teardown() -> Result<()> {
