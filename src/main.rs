@@ -3,6 +3,7 @@ extern crate clap;
 extern crate error_chain;
 extern crate libc;
 
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::ffi::CString;
 use std::net::{TcpListener, TcpStream};
@@ -63,6 +64,9 @@ fn run(port: u16) -> Result<()> {
 
     let mut contents = vec![0u8; 10 * 1024 * 1024];
 
+    let mut insertions = HashMap::new();
+    let mut issuances = HashMap::new();
+
     loop {
         let poll_result = unsafe {
             libc::poll(
@@ -76,15 +80,107 @@ fn run(port: u16) -> Result<()> {
         }
         // Check for new data on the trace_pipe
         if pollfds[0].revents & libc::POLLIN != 0 {
-            let bytes_read = unsafe {
-                libc::read(
-                    trace_pipe_fd,
-                    contents.as_mut_ptr() as *mut libc::c_void,
-                    contents.len() - 1
-                )
-            } as usize;
-            let data = String::from_utf8_lossy(&contents[..bytes_read]);
-            dbg!(data);
+            let data = {
+                let bytes_read = unsafe {
+                    libc::read(
+                        trace_pipe_fd,
+                        contents.as_mut_ptr() as *mut libc::c_void,
+                        contents.len() - 1
+                    ) as usize
+                };
+                String::from_utf8_lossy(&contents[..bytes_read])
+            };
+            for line in data.lines() {
+                let words: Vec<&str> = line.split_ascii_whitespace().collect();
+                // The definition seems to be from here:
+                // https://github.com/torvalds/linux/blob/master/include/trace/events/block.h#L175
+                // Looks like the fields in this TP_printk are words[5:]; words[0:4] seem to be constant.
+                // Unfortunately, words[0] can contain whitespace. m(
+                // Since we don't really need words[0], look for a subslice that starts at a position
+                // such that words[1] contains the number in brackets.
+                let mut start = None;
+                for (idx, word) in words.iter().enumerate() {
+                    if word.starts_with("[") {
+                        start = Some(idx - 1);
+                        break;
+                    }
+                }
+                if start.is_none() {
+                    eprintln!("Malformatted line (can't find '['): {}", line);
+                    continue;
+                }
+                let words = &words[start.unwrap()..];
+                //dbg!(words);
+                // Get time from words[3]
+                // Unfortunately there's a : at the end, so cut that away first
+                let time = match words[3][..words[3].len() -1].parse::<f64>() {
+                    Ok(t) => t,
+                    Err(_) => {
+                        eprintln!("Malformatted line (invalid time): {}", line);
+                        continue;
+                    }
+                };
+
+                // Op has the same : problem
+                let op = &words[4][..words[4].len() - 1];
+                let dev = words[5];
+                let rwbs = words[6];
+
+                if dev == "0,0" {
+                    continue;
+                }
+
+                let optype =
+                    if rwbs.contains("R") {
+                        "read"
+                    } else if rwbs.contains("W") {
+                        "write"
+                    } else {
+                        eprintln!("Ignoring line (unknown optype): {}", line);
+                        continue;
+                    };
+
+                //let dev_path = get_dev_path(dev);
+
+
+                match op {
+                    "block_rq_insert" => {
+                        // insert and issue ops have a request size field
+                        let _reqsz = words[7];
+                        let sector = words[9];
+                        let nr_sectors = words[11];
+                        let event_key = format!("{},{},{}", dev, sector, nr_sectors);
+                        insertions.insert(event_key, time);
+                    },
+                    "block_rq_issue" => {
+                        // insert and issue ops have a request size field
+                        let _reqsz = words[7];
+                        let sector = words[9];
+                        let nr_sectors = words[11];
+                        let event_key = format!("{},{},{}", dev, sector, nr_sectors);
+                        issuances.insert(event_key, time);
+                    },
+                    "block_rq_complete" => {
+                        // complete ops do not have the size field
+                        let sector = words[8];
+                        let nr_sectors = words[10];
+                        let event_key = format!("{},{},{}", dev, sector, nr_sectors);
+                        let insertion = match insertions.remove(&event_key) {
+                            Some(t) => t,
+                            None => continue
+                        };
+                        let issuance = match issuances.remove(&event_key) {
+                            Some(t) => t,
+                            None => continue
+                        };
+                        let queue_time = issuance - insertion;
+                        let disk_time  = time - issuance;
+                        let total_time = queue_time + disk_time;
+                        dbg!(total_time);
+                    },
+                    _ => continue
+                }
+            }
         }
         // Check for a new incoming connection on the listener
         if pollfds[1].revents & libc::POLLIN != 0 {
