@@ -3,8 +3,10 @@ extern crate clap;
 extern crate error_chain;
 extern crate libc;
 
+use std::io::prelude::*;
 use std::ffi::CString;
-//use std::os::unix::io::AsRawFd;
+use std::net::{TcpListener, TcpStream};
+use std::os::unix::io::AsRawFd;
 
 use clap::{Arg, App};
 
@@ -28,7 +30,7 @@ fn print_error(msg: &str, e: &Error) {
     }
 }
 
-fn run(_port: u16) -> Result<()> {
+fn run(port: u16) -> Result<()> {
     /*let mut stream = File::open(ktrace::socket_path())
         .chain_err(|| "no open no stop mah show")?;*/
     let trace_pipe_fd = unsafe {
@@ -37,16 +39,33 @@ fn run(_port: u16) -> Result<()> {
             libc::O_RDONLY | libc::O_NONBLOCK
         )
     };
-    let mut pollfds = [
+
+    let listener = TcpListener::bind(format!(":::{}", port))
+        .chain_err(|| "Could not start server")?;
+    listener.set_nonblocking(true)
+        .chain_err(|| "Could not set nonblocking")?;
+
+    let mut clients = vec![];
+    println!("TCP server listening on port {}.", port);
+
+    let mut pollfds = vec![
         libc::pollfd {
             //fd:      stream.as_raw_fd(),
             fd:      trace_pipe_fd,
             events:  libc::POLLIN,
             revents: 0
+        },
+        libc::pollfd {
+            fd:      listener.as_raw_fd(),
+            events:  libc::POLLIN,
+            revents: 0
         }
     ];
+
     let mut contents = vec![0u8; 10 * 1024 * 1024];
+
     loop {
+        println!("polling {} fds...", pollfds.len());
         let poll_result = unsafe {
             libc::poll(
                 &mut pollfds[0] as *mut libc::pollfd,
@@ -57,6 +76,7 @@ fn run(_port: u16) -> Result<()> {
         if poll_result == -1 {
             bail!("Couldn't poll: {:?}", std::io::Error::last_os_error());
         }
+        // Check for new data on the trace_pipe
         if pollfds[0].revents & libc::POLLIN != 0 {
             println!("READ OMFG");
             let bytes_read = unsafe {
@@ -67,6 +87,60 @@ fn run(_port: u16) -> Result<()> {
                 )
             } as usize;
             println!("Dataz: {}", String::from_utf8_lossy(&contents[..bytes_read]));
+        }
+        // Check for a new incoming connection on the listener
+        if pollfds[1].revents & libc::POLLIN != 0 {
+            println!("CONNECTION OMFG");
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        if let Ok(addr) = stream.peer_addr() {
+                            println!("New connection from {:?}.", addr);
+                        }
+
+                        pollfds.push(
+                            libc::pollfd {
+                                fd: stream.as_raw_fd(),
+                                events: libc::POLLIN,
+                                revents: 0
+                            }
+                        );
+                        clients.push(stream);
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        break;
+                    }
+                    Err(e) => {
+                        Err(e).chain_err(|| "Could not accept client connection")?;
+                    }
+                }
+            }
+        }
+        // Check any additional fds as client connections
+        let mut remove_client = None;
+        for (client_fd_idx, client_fd) in pollfds.iter().enumerate().skip(2) {
+            if client_fd.revents & libc::POLLIN != 0 {
+                // Find the TcpStream that this fd belongs to
+                for (client_idx, client) in clients.iter_mut().enumerate() {
+                    if client.as_raw_fd() == client_fd.fd {
+                        // Handle the request
+                        remove_client = Some((client_fd_idx, client_idx));
+                        let mut data = [0u8; 16_384];
+                        let data_len = client.read(&mut data)
+                            .chain_err(|| "Could not read client data")?
+                            as usize;
+                        println!("Request: {}", String::from_utf8_lossy(&data[..data_len]));
+                        client.write(
+                            b"HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 6\n\nhallo\n"
+                        ).chain_err(|| "Could not send response to client")?;
+                        break;
+                    }
+                }
+            }
+        }
+        if let Some((client_fd_idx, client_idx)) = remove_client.take() {
+            pollfds.remove(client_fd_idx);
+            clients.remove(client_idx);
         }
     }
 
