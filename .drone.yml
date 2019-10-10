@@ -7,19 +7,6 @@ steps:
   commands:
   - cargo build --release
 
-- name: build Rust docker image
-  image: plugins/docker
-  settings:
-    repo: docker.funzt-halt.net/lagerist
-    tags: latest
-    dockerfile: Dockerfile.rust
-    cache_from: docker.funzt-halt.net/lagerist:latest
-  when:
-    branch: master
-    event:
-      exclude:
-      - pull_request
-
 - name: build python version
   image: plugins/docker
   settings:
@@ -27,6 +14,19 @@ steps:
     tags: python
     dockerfile: Dockerfile.python
     cache_from: docker.funzt-halt.net/lagerist:python
+  when:
+    branch: master
+    event:
+      exclude:
+      - pull_request
+
+- name: build Rust docker image
+  image: plugins/docker
+  settings:
+    repo: docker.funzt-halt.net/lagerist
+    tags: rust
+    dockerfile: Dockerfile.rust
+    cache_from: docker.funzt-halt.net/lagerist:rust
   when:
     branch: master
     event:
