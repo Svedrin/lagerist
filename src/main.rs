@@ -46,7 +46,6 @@ fn run(port: u16) -> Result<()> {
         .chain_err(|| "Could not set nonblocking")?;
 
     let mut clients = vec![];
-    println!("TCP server listening on port {}.", port);
 
     let mut pollfds = vec![
         libc::pollfd {
@@ -65,7 +64,6 @@ fn run(port: u16) -> Result<()> {
     let mut contents = vec![0u8; 10 * 1024 * 1024];
 
     loop {
-        println!("polling {} fds...", pollfds.len());
         let poll_result = unsafe {
             libc::poll(
                 &mut pollfds[0] as *mut libc::pollfd,
@@ -78,7 +76,6 @@ fn run(port: u16) -> Result<()> {
         }
         // Check for new data on the trace_pipe
         if pollfds[0].revents & libc::POLLIN != 0 {
-            println!("READ OMFG");
             let bytes_read = unsafe {
                 libc::read(
                     trace_pipe_fd,
@@ -86,16 +83,16 @@ fn run(port: u16) -> Result<()> {
                     contents.len() - 1
                 )
             } as usize;
-            println!("Dataz: {}", String::from_utf8_lossy(&contents[..bytes_read]));
+            let data = String::from_utf8_lossy(&contents[..bytes_read]);
+            dbg!(data);
         }
         // Check for a new incoming connection on the listener
         if pollfds[1].revents & libc::POLLIN != 0 {
-            println!("CONNECTION OMFG");
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
                         if let Ok(addr) = stream.peer_addr() {
-                            println!("New connection from {:?}.", addr);
+                            dbg!(addr);
                         }
 
                         pollfds.push(
@@ -123,13 +120,13 @@ fn run(port: u16) -> Result<()> {
                 // Find the TcpStream that this fd belongs to
                 for (client_idx, client) in clients.iter_mut().enumerate() {
                     if client.as_raw_fd() == client_fd.fd {
-                        // Handle the request
+                        // Handle the request. We always use Connection:Close semantics because easier.
                         remove_client = Some((client_fd_idx, client_idx));
                         let mut data = [0u8; 16_384];
                         let data_len = client.read(&mut data)
                             .chain_err(|| "Could not read client data")?
                             as usize;
-                        println!("Request: {}", String::from_utf8_lossy(&data[..data_len]));
+                        // We don't really care for the request, we always respond with our data
                         client.write(
                             b"HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 6\n\nhallo\n"
                         ).chain_err(|| "Could not send response to client")?;
