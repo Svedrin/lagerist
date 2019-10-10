@@ -1,9 +1,12 @@
 extern crate clap;
 #[macro_use]
 extern crate error_chain;
+extern crate ctrlc;
 extern crate libc;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::io::prelude::*;
 use std::ffi::CString;
 use std::net::{TcpListener, TcpStream};
@@ -32,8 +35,13 @@ fn print_error(msg: &str, e: &Error) {
 }
 
 fn run(port: u16) -> Result<()> {
-    /*let mut stream = File::open(ktrace::socket_path())
-        .chain_err(|| "no open no stop mah show")?;*/
+    let running = Arc::new(AtomicBool::new(true));
+    let running_clone = running.clone();
+
+    ctrlc::set_handler(move || {
+        running_clone.store(false, Ordering::SeqCst);
+    }).expect("Error setting Ctrl-C handler");
+
     let trace_pipe_fd = unsafe {
         libc::open(
             CString::new(ktrace::socket_path()).unwrap().as_ptr(),
@@ -67,7 +75,7 @@ fn run(port: u16) -> Result<()> {
     let mut insertions = HashMap::new();
     let mut issuances = HashMap::new();
 
-    loop {
+    while running.load(Ordering::SeqCst) {
         let poll_result = unsafe {
             libc::poll(
                 &mut pollfds[0] as *mut libc::pollfd,
@@ -76,7 +84,15 @@ fn run(port: u16) -> Result<()> {
             )
         };
         if poll_result == -1 {
-            bail!("Couldn't poll: {:?}", std::io::Error::last_os_error());
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::Interrupted {
+                // Probably came from hitting ctrl+c. Just in case it didn't,
+                // let the while loop make that decision.
+                continue
+            }
+            else {
+                bail!("Couldn't poll: {:?}", err);
+            }
         }
         // Check for new data on the trace_pipe
         if pollfds[0].revents & libc::POLLIN != 0 {
@@ -235,6 +251,10 @@ fn run(port: u16) -> Result<()> {
             pollfds.remove(client_fd_idx);
             clients.remove(client_idx);
         }
+    }
+
+    unsafe {
+        libc::close(trace_pipe_fd);
     }
 
     Ok(())
