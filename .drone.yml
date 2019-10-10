@@ -19,7 +19,6 @@ steps:
       - sha256
   when:
     event: tag
-    branch: master
 
 - name: build python version
   image: plugins/docker
@@ -29,7 +28,6 @@ steps:
     dockerfile: Dockerfile.python
     cache_from: docker.funzt-halt.net/lagerist:python
   when:
-    branch: master
     event:
       exclude:
       - pull_request
@@ -41,12 +39,11 @@ steps:
     tags: rust
     dockerfile: Dockerfile.rust
   when:
-    branch: master
     event:
       exclude:
       - pull_request
 ---
 kind: signature
-hmac: 81c124d570d729fc93b77df3e054ec8d190e2eb3241769d43114846ee64ad343
+hmac: b38ee3b2a89226532543c8c16fd4db9750dc68bef3589c36a87a63f58e559c86
 
 ...
