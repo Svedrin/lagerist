@@ -1,5 +1,5 @@
-FROM alpine:latest
-RUN apk add --no-cache dumb-init
+FROM debian:buster-slim
+RUN apt-get update && apt-get -y install dumb-init
 
 COPY target/release/lagerist  /app/
 WORKDIR /app
