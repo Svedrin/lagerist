@@ -3,6 +3,8 @@ extern crate clap;
 extern crate error_chain;
 extern crate ctrlc;
 extern crate libc;
+#[macro_use]
+extern crate prometheus;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,6 +13,7 @@ use std::io::prelude::*;
 use std::ffi::CString;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
+use prometheus::{TextEncoder, Encoder};
 
 use clap::{Arg, App};
 
@@ -35,13 +38,42 @@ fn print_error(msg: &str, e: &Error) {
     }
 }
 
+const HISTOGRAM_BUCKETS : [f64; 17] = [
+    0.01,  0.025,  0.05,  0.075,
+    0.1,   0.25,   0.5,   0.75,
+    1.0,   2.5,    5.0,   7.5,
+   10.0,  25.0,   50.0,  75.0,
+  100.0
+];
+
+
 fn run(port: u16) -> Result<()> {
+    // Initialize ^c handler
     let running = Arc::new(AtomicBool::new(true));
     let running_clone = running.clone();
 
     ctrlc::set_handler(move || {
         running_clone.store(false, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");
+
+    // Set up Prometheus registry and histograms
+    let h_queue_time = register_histogram_vec!(
+        histogram_opts!("diskio_queue_time_seconds", "Time spent in the queue")
+            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+        &["device", "optype"]
+    ).expect("Couldn't set up queue time histogram");
+
+    let h_disk_time = register_histogram_vec!(
+        histogram_opts!("diskio_disk_time_seconds", "Time spent on the device")
+            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+        &["device", "optype"]
+    ).expect("Couldn't set up disk time histogram");
+
+    let h_total_time = register_histogram_vec!(
+        histogram_opts!("diskio_total_time_seconds", "Total time spent")
+            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+        &["device", "optype"]
+    ).expect("Couldn't set up total time histogram");
 
     let trace_pipe_fd = unsafe {
         libc::open(
@@ -193,7 +225,10 @@ fn run(port: u16) -> Result<()> {
                         let queue_time = issuance - insertion;
                         let disk_time  = time - issuance;
                         let total_time = queue_time + disk_time;
-                        dbg!(dev_path, total_time);
+                        dbg!(&dev_path, total_time);
+                        h_queue_time.with_label_values(&[&dev_path, optype]).observe(queue_time);
+                        h_disk_time.with_label_values(&[&dev_path, optype]).observe(disk_time);
+                        h_total_time.with_label_values(&[&dev_path, optype]).observe(total_time);
                     },
                     _ => continue
                 }
@@ -238,10 +273,19 @@ fn run(port: u16) -> Result<()> {
                         let mut data = [0u8; 16_384];
                         client.read(&mut data)
                             .chain_err(|| "Could not read client data")?;
+
                         // We don't really care for the request, we always respond with our data
-                        client.write(
-                            b"HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 6\n\nhallo\n"
-                        ).chain_err(|| "Could not send response to client")?;
+                        let mut buffer = Vec::new();
+                        let encoder = TextEncoder::new();
+                        let metric_families = prometheus::gather();
+                        encoder.encode(&metric_families, &mut buffer).unwrap();
+                        let output = String::from_utf8(buffer).unwrap();
+                        let response = format!(
+                            "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: {}\n\n{}\n",
+                            output.len(),
+                            output
+                        );
+                        client.write(response.as_bytes()).chain_err(|| "Could not send response to client")?;
                         break;
                     }
                 }
