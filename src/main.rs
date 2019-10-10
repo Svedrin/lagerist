@@ -225,7 +225,7 @@ fn run(port: u16) -> Result<()> {
                         let queue_time = issuance - insertion;
                         let disk_time  = time - issuance;
                         let total_time = queue_time + disk_time;
-                        dbg!(&dev_path, total_time);
+                        //dbg!(&dev_path, total_time);
                         h_queue_time.with_label_values(&[&dev_path, optype]).observe(queue_time);
                         h_disk_time.with_label_values(&[&dev_path, optype]).observe(disk_time);
                         h_total_time.with_label_values(&[&dev_path, optype]).observe(total_time);
@@ -239,9 +239,9 @@ fn run(port: u16) -> Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        if let Ok(addr) = stream.peer_addr() {
+                        /*if let Ok(addr) = stream.peer_addr() {
                             dbg!(addr);
-                        }
+                        }*/
 
                         pollfds.push(
                             libc::pollfd {
