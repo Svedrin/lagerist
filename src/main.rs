@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::io::prelude::*;
 use std::ffi::CString;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
 
 use clap::{Arg, App};
@@ -236,9 +236,8 @@ fn run(port: u16) -> Result<()> {
                         // Handle the request. We always use Connection:Close semantics because easier.
                         remove_client = Some((client_fd_idx, client_idx));
                         let mut data = [0u8; 16_384];
-                        let data_len = client.read(&mut data)
-                            .chain_err(|| "Could not read client data")?
-                            as usize;
+                        client.read(&mut data)
+                            .chain_err(|| "Could not read client data")?;
                         // We don't really care for the request, we always respond with our data
                         client.write(
                             b"HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: 6\n\nhallo\n"
