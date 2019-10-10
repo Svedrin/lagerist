@@ -15,6 +15,7 @@ use std::os::unix::io::AsRawFd;
 use clap::{Arg, App};
 
 mod ktrace;
+mod dev;
 
 mod errors {
     error_chain! { }
@@ -74,6 +75,7 @@ fn run(port: u16) -> Result<()> {
 
     let mut insertions = HashMap::new();
     let mut issuances = HashMap::new();
+    let mut device_paths = dev::DevicePaths::new();
 
     while running.load(Ordering::SeqCst) {
         let poll_result = unsafe {
@@ -156,8 +158,7 @@ fn run(port: u16) -> Result<()> {
                         continue;
                     };
 
-                //let dev_path = get_dev_path(dev);
-
+                let dev_path = device_paths.get_dev_path(dev);
 
                 match op {
                     "block_rq_insert" => {
@@ -192,7 +193,7 @@ fn run(port: u16) -> Result<()> {
                         let queue_time = issuance - insertion;
                         let disk_time  = time - issuance;
                         let total_time = queue_time + disk_time;
-                        dbg!(total_time);
+                        dbg!(dev_path, total_time);
                     },
                     _ => continue
                 }
