@@ -186,7 +186,7 @@ fn run(port: u16) -> Result<()> {
                     } else if rwbs.contains("W") {
                         "write"
                     } else {
-                        eprintln!("Ignoring line (unknown optype): {}", line);
+                        //eprintln!("Ignoring line (unknown optype): {}", line);
                         continue;
                     };
 
