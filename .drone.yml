@@ -8,6 +8,19 @@ steps:
   commands:
   - cargo build --release
 
+- name: publish
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github-token
+    files:
+      - target/release/lagerist
+    checksum:
+      - sha256
+  when:
+    event: tag
+    branch: master
+
 - name: build python version
   image: plugins/docker
   settings:
@@ -32,24 +45,8 @@ steps:
     event:
       exclude:
       - pull_request
-
-- name: publish
-  image: plugins/github-release
-  settings:
-    api_key:
-      from_secret: github-token
-    files:
-      - target/release/lagerist
-    checksum:
-      - sha256
-  when:
-    #event: tag
-    branch: master
-    event:
-      exclude:
-      - pull_request
 ---
 kind: signature
-hmac: f393115a1c98dafdb909b64753cabee0d674595a55c5fce58f9b7f3d7ad0707c
+hmac: 81c124d570d729fc93b77df3e054ec8d190e2eb3241769d43114846ee64ad343
 
 ...
