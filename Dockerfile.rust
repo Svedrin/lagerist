@@ -1,7 +1,7 @@
 FROM alpine:latest
 RUN apk add --no-cache dumb-init
 
-COPY target/release/lagerist  /app
+COPY target/release/lagerist  /app/
 WORKDIR /app
 
 VOLUME ["/proc", "/sys", "/dev"]
