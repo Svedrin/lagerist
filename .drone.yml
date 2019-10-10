@@ -2,6 +2,24 @@ kind: pipeline
 name: default
 
 steps:
+- name: build Rust version
+  image: rust:latest
+  commands:
+  - cargo build --release
+
+- name: build Rust docker image
+  image: plugins/docker
+  settings:
+    repo: docker.funzt-halt.net/lagerist
+    tags: latest
+    dockerfile: Dockerfile.rust
+    cache_from: docker.funzt-halt.net/lagerist:latest
+  when:
+    branch: master
+    event:
+      exclude:
+      - pull_request
+
 - name: build python version
   image: plugins/docker
   settings:

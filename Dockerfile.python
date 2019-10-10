@@ -7,7 +7,7 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 COPY lagerist.py /app
 WORKDIR /app
 
-VOLUME ["/proc", "/sys"]
+VOLUME ["/proc", "/sys", "/dev"]
 EXPOSE 9165
 ENTRYPOINT ["dumb-init", "--"]
 CMD [ "python3", "lagerist.py" ]
