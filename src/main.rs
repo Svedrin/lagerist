@@ -75,6 +75,16 @@ fn run(port: u16) -> Result<()> {
         &["device", "optype"]
     ).expect("Couldn't set up total time histogram");
 
+    let g_insertions_len = register_gauge!(
+        "insertions_hashmap_len",
+         "Entries in the 'insertions' hashmap (updated every 10m)"
+    ).expect("Couldn't set up insertions gauge");
+
+    let g_issuances_len = register_gauge!(
+        "issuances_hashmap_len",
+         "Entries in the 'issuances' hashmap (updated every 10m)"
+    ).expect("Couldn't set up issuances gauge");
+
     let trace_pipe_fd = unsafe {
         libc::open(
             CString::new(ktrace::socket_path()).unwrap().as_ptr(),
@@ -187,6 +197,8 @@ fn run(port: u16) -> Result<()> {
                     insertions.retain(|_, v| time < *v + 600.0 );
                     issuances.retain( |_, v| time < *v + 600.0 );
                     next_cleanup = time + 600.0;
+                    g_insertions_len.set(insertions.len() as f64);
+                    g_issuances_len.set(issuances.len() as f64);
                 }
 
                 let optype =
