@@ -184,8 +184,8 @@ fn run(port: u16) -> Result<()> {
 
                 // Hash table housekeeping
                 if time > next_cleanup {
-                    insertions.retain(|_, v| *v + 600.0 > time );
-                    issuances.retain(|_, v| *v + 600.0 > time );
+                    insertions.retain(|_, v| time < *v + 600.0 );
+                    issuances.retain( |_, v| time < *v + 600.0 );
                     next_cleanup = time + 600.0;
                 }
 
