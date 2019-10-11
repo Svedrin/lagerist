@@ -109,6 +109,8 @@ fn run(port: u16) -> Result<()> {
     let mut issuances = HashMap::new();
     let mut device_paths = dev::DevicePaths::new();
 
+    let mut next_cleanup = 0.0;
+
     while running.load(Ordering::SeqCst) {
         let poll_result = unsafe {
             libc::poll(
@@ -178,6 +180,13 @@ fn run(port: u16) -> Result<()> {
 
                 if dev == "0,0" {
                     continue;
+                }
+
+                // Hash table housekeeping
+                if time > next_cleanup {
+                    insertions.retain(|_, v| *v + 600.0 > time );
+                    issuances.retain(|_, v| *v + 600.0 > time );
+                    next_cleanup = time + 600.0;
                 }
 
                 let optype =
