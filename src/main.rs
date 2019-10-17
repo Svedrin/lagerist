@@ -38,6 +38,8 @@ fn print_error(msg: &str, e: &Error) {
     }
 }
 
+const BUFSIZE : usize = 10 * 1024 * 1024;
+
 const HISTOGRAM_BUCKETS : [f64; 17] = [
     0.01,  0.025,  0.05,  0.075,
     0.1,   0.25,   0.5,   0.75,
@@ -113,7 +115,7 @@ fn run(port: u16) -> Result<()> {
         }
     ];
 
-    let mut contents = vec![0u8; 10 * 1024 * 1024];
+    let mut contents = vec![0u8; BUFSIZE];
 
     let mut insertions = HashMap::new();
     let mut issuances = HashMap::new();
@@ -147,7 +149,7 @@ fn run(port: u16) -> Result<()> {
                     libc::read(
                         trace_pipe_fd,
                         contents.as_mut_ptr() as *mut libc::c_void,
-                        contents.len() - 1
+                        BUFSIZE - 1
                     ) as usize
                 };
                 String::from_utf8_lossy(&contents[..bytes_read])
