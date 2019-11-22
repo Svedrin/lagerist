@@ -32,7 +32,7 @@ steps:
       exclude:
       - pull_request
 
-- name: build Rust docker image
+- name: build Rust version
   image: plugins/docker
   settings:
     repo: docker.funzt-halt.net/lagerist
@@ -42,8 +42,24 @@ steps:
     event:
       exclude:
       - pull_request
+
+- name: build public docker image
+  image: plugins/docker
+  settings:
+    repo: svedrin/lagerist
+    tags: latest
+    username: svedrin
+    dockerfile: Dockerfile.rust
+    password:
+      from_secret: docker-registry-pw
+    cache_from: "svedrin/lagerist:latest"
+  when:
+    branch: master
+    event:
+      exclude:
+      - pull_request
 ---
 kind: signature
-hmac: b38ee3b2a89226532543c8c16fd4db9750dc68bef3589c36a87a63f58e559c86
+hmac: a36e8f1f5828976a26c55853af3c4ff462b2564981b69959edf0de9934db28f7
 
 ...
