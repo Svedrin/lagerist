@@ -32,7 +32,7 @@ steps:
       exclude:
       - pull_request
 
-- name: build Rust version
+- name: build Rust docker image
   image: plugins/docker
   settings:
     repo: docker.funzt-halt.net/lagerist
@@ -60,6 +60,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: a36e8f1f5828976a26c55853af3c4ff462b2564981b69959edf0de9934db28f7
+hmac: ae685fe6714f17d7ea381a09054184f82baf2f1720b96bf2bcda5a8a5fbe0157
 
 ...
