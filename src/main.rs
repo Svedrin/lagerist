@@ -163,7 +163,7 @@ fn run(port: u16) -> Result<()> {
                         bail!("Couldn't read: {:?}", err);
                     }
                 }
-                String::from_utf8_lossy(&contents[..bytes_read])
+                String::from_utf8_lossy(&contents[..(bytes_read as usize)])
             };
             for line in data.lines() {
                 let words: Vec<&str> = line.split_ascii_whitespace().collect();
