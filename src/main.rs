@@ -150,8 +150,19 @@ fn run(port: u16) -> Result<()> {
                         trace_pipe_fd,
                         contents.as_mut_ptr() as *mut libc::c_void,
                         BUFSIZE - 1
-                    ) as usize
+                    ) as isize
                 };
+                if bytes_read == -1 {
+                    let err = std::io::Error::last_os_error();
+                    if err.kind() == std::io::ErrorKind::Interrupted {
+                        // Probably came from hitting ctrl+c. Just in case it didn't,
+                        // let the while loop make that decision.
+                        continue
+                    }
+                    else {
+                        bail!("Couldn't read: {:?}", err);
+                    }
+                }
                 String::from_utf8_lossy(&contents[..bytes_read])
             };
             for line in data.lines() {
