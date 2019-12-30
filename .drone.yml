@@ -21,30 +21,7 @@ steps:
   when:
     event: tag
 
-- name: build python version
-  image: plugins/docker
-  settings:
-    repo: docker.funzt-halt.net/lagerist
-    tags: python
-    dockerfile: Dockerfile.python
-    cache_from: docker.funzt-halt.net/lagerist:python
-  when:
-    event:
-      exclude:
-      - pull_request
-
-- name: build Rust docker image
-  image: plugins/docker
-  settings:
-    repo: docker.funzt-halt.net/lagerist
-    tags: rust
-    dockerfile: Dockerfile.rust
-  when:
-    event:
-      exclude:
-      - pull_request
-
-- name: build public docker image
+- name: build docker image
   image: plugins/docker
   settings:
     repo: svedrin/lagerist
@@ -61,6 +38,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: c30c883e0d46c646f82248d8e9561a193b0c77b610c9feae439f8a70f257d67f
+hmac: 0331cea4736c0e63a1edd3b224307b8137c10ab78cbd4a43fa166bde7e736b51
 
 ...
