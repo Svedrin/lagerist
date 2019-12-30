@@ -27,7 +27,6 @@ steps:
   commands:
   - echo -n ",${DRONE_TAG}" >> .tags
   when:
-    branch: master
     event: tag
 
 - name: build docker image
@@ -44,6 +43,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: ec72525c695e60b9e2aef2c41759f4b8ba63a4049737f0db32c63eaf359b53dd
+hmac: f4c306be9f3da10954bf1b98577846e87c768bfb20986778f9eef0ebad4a08ab
 
 ...
