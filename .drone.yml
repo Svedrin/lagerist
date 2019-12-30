@@ -39,7 +39,6 @@ steps:
       from_secret: docker-registry-pw
     cache_from: "svedrin/lagerist:latest"
   when:
-    branch: master
     event:
       exclude:
       - pull_request
