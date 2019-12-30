@@ -145,25 +145,29 @@ fn run(port: u16) -> Result<()> {
         // Check for new data on the trace_pipe
         if pollfds[0].revents & libc::POLLIN != 0 {
             let data = {
-                let bytes_read = unsafe {
-                    libc::read(
-                        trace_pipe_fd,
-                        contents.as_mut_ptr() as *mut libc::c_void,
-                        BUFSIZE - 1
-                    ) as isize
-                };
-                if bytes_read == -1 {
-                    let err = std::io::Error::last_os_error();
-                    if err.kind() == std::io::ErrorKind::Interrupted {
-                        // Probably came from hitting ctrl+c. Just in case it didn't,
-                        // let the while loop make that decision.
-                        continue
+                let mut read_pos: usize = 0;
+                loop {
+                    let bytes_read = unsafe {
+                        libc::read(
+                            trace_pipe_fd,
+                            contents.as_mut_ptr().add(read_pos) as *mut libc::c_void,
+                            BUFSIZE - 1
+                        ) as isize
+                    };
+                    if bytes_read == -1 {
+                        let err = std::io::Error::last_os_error();
+                        match err.kind() {
+                            std::io::ErrorKind::Interrupted => continue, // retry
+                            std::io::ErrorKind::WouldBlock  => break,    // done
+                            _ => bail!("Couldn't read: {:?}", err)
+                        }
                     }
-                    else {
-                        bail!("Couldn't read: {:?}", err);
-                    }
+                    // bytes_read cannot be < 0 at this point - the only negative value
+                    // that it may return is -1, and we caught that above
+                    assert!(bytes_read >= 0, "read a negative amount of bytes");
+                    read_pos += bytes_read as usize;
                 }
-                String::from_utf8_lossy(&contents[..(bytes_read as usize)])
+                String::from_utf8_lossy(&contents[..read_pos])
             };
             for line in data.lines() {
                 let words: Vec<&str> = line.split_ascii_whitespace().collect();
