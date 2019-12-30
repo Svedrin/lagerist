@@ -8,6 +8,7 @@ steps:
   commands:
   - apk add --no-cache musl-dev
   - cargo build --release
+  - echo -n "latest" > .tags
 
 - name: publish
   image: plugins/github-release
@@ -21,11 +22,18 @@ steps:
   when:
     event: tag
 
+- name: set version tag
+  image: alpine:latest
+  commands:
+  - echo -n ",${DRONE_TAG}" >> .tags
+  when:
+    branch: master
+    event: tag
+
 - name: build docker image
   image: plugins/docker
   settings:
     repo: svedrin/lagerist
-    tags: latest
     username: svedrin
     password:
       from_secret: docker-registry-pw
@@ -37,6 +45,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: d2c20b5584302404bca3562ba77583c3eff65467a6042bd21a055ccafdfa362d
+hmac: ec72525c695e60b9e2aef2c41759f4b8ba63a4049737f0db32c63eaf359b53dd
 
 ...
