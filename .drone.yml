@@ -4,8 +4,9 @@ name: default
 
 steps:
 - name: build Rust version
-  image: rust:latest
+  image: rust:alpine
   commands:
+  - apk add --no-cache musl-dev
   - cargo build --release
 
 - name: publish
@@ -60,6 +61,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: ae685fe6714f17d7ea381a09054184f82baf2f1720b96bf2bcda5a8a5fbe0157
+hmac: c30c883e0d46c646f82248d8e9561a193b0c77b610c9feae439f8a70f257d67f
 
 ...
