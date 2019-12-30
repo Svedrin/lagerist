@@ -27,7 +27,6 @@ steps:
     repo: svedrin/lagerist
     tags: latest
     username: svedrin
-    dockerfile: Dockerfile.rust
     password:
       from_secret: docker-registry-pw
     cache_from: "svedrin/lagerist:latest"
@@ -38,6 +37,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: 0331cea4736c0e63a1edd3b224307b8137c10ab78cbd4a43fa166bde7e736b51
+hmac: d2c20b5584302404bca3562ba77583c3eff65467a6042bd21a055ccafdfa362d
 
 ...
