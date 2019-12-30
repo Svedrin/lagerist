@@ -16,7 +16,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 11,
-  "iteration": 1570719474074,
+  "iteration": 1570742022997,
   "links": [],
   "panels": [
     {
@@ -49,7 +49,7 @@
       "reverseYBuckets": false,
       "targets": [
         {
-          "expr": "rate(diskio_total_time_seconds_bucket{device=\"$device\",optype=\"$optype\"}[5m])",
+          "expr": "rate(diskio_total_time_seconds_bucket{instance=\"$instance\",device=\"$device\",optype=\"$optype\"}[5m])",
           "format": "heatmap",
           "interval": "5m",
           "legendFormat": "{{le}}",
@@ -91,7 +91,44 @@
       {
         "allValue": null,
         "current": {
-          "selected": true,
+          "selected": false,
+          "text": "host1",
+          "value": "host1"
+        },
+        "datasource": "prometheus",
+        "definition": "diskio_total_time_seconds_sum",
+        "hide": 0,
+        "includeAll": false,
+        "label": null,
+        "multi": false,
+        "name": "instance",
+        "options": [
+          {
+            "selected": false,
+            "text": "host1",
+            "value": "host1"
+          },
+          {
+            "selected": true,
+            "text": "host2",
+            "value": "host2"
+          }
+        ],
+        "query": "diskio_total_time_seconds_sum",
+        "refresh": 0,
+        "regex": "/.*instance=\"([^\"]+)\".*/",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": null,
+        "current": {
+          "selected": false,
           "text": "/dev/sda",
           "value": "/dev/sda"
         },
@@ -129,7 +166,6 @@
         "allValue": null,
         "current": {
           "selected": true,
-          "tags": [],
           "text": "write",
           "value": "write"
         },
@@ -186,5 +222,5 @@
   "timezone": "",
   "title": "Disk IO Histograms",
   "uid": "C-3IirhWz",
-  "version": 4
+  "version": 6
 }
