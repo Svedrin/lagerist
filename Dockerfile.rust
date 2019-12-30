@@ -9,4 +9,4 @@ EXPOSE 9165
 ENTRYPOINT ["dumb-init", "--"]
 CMD [ "/app/lagerist" ]
 
-# run using: docker run --rm -it -v /proc:/proc:ro /dev:/dev:ro /sys:/sys lagerist
+# run using: docker run --rm -it -v /proc:/proc -v /dev:/dev:ro -v /sys:/sys lagerist
