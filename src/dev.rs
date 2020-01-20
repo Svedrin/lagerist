@@ -21,6 +21,11 @@ impl DevicePaths {
         let (major, minor) = (parts[0], parts[1]);
         let mut name = None;
 
+        if major == "7" {
+            // These are not listed in /proc/partitions but generate events
+            return Ok(format!("/dev/loop{}", minor));
+        }
+
         for line in self.proc_partitions.lines().skip(2) {
             let fields: Vec<&str> = line.split_ascii_whitespace().collect();
             if fields[0] == major && fields[1] == minor {
