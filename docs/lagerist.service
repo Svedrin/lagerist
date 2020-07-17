@@ -1,0 +1,11 @@
+[Unit]
+WantedBy=multi-user.target
+Description=Disk IO Latency exporter for Prometheus
+After=network.target
+
+[Service]
+ExecStart=/usr/local/sbin/lagerist
+User=root
+
+[Install]
+WantedBy=multi-user.target
