@@ -40,12 +40,18 @@ fn print_error(msg: &str, e: &Error) {
 
 const BUFSIZE : usize = 10 * 1024 * 1024;
 
-const HISTOGRAM_BUCKETS : [f64; 17] = [
+// Buckets for queue/disk/total time histograms, in ms
+const TIME_HISTOGRAM_BUCKETS: [f64; 17] = [
     0.01,  0.025,  0.05,  0.075,
     0.1,   0.25,   0.5,   0.75,
     1.0,   2.5,    5.0,   7.5,
    10.0,  25.0,   50.0,  75.0,
   100.0
+];
+
+// Buckets for request size histograms, in kib
+const SIZE_HISTOGRAM_BUCKETS : [u64; 8] = [
+    4, 8, 16, 32, 64, 128, 256, 512
 ];
 
 
@@ -61,19 +67,31 @@ fn run(port: u16) -> Result<()> {
     // Set up Prometheus registry and histograms
     let h_queue_time = register_histogram_vec!(
         histogram_opts!("diskio_queue_time_seconds", "Time spent in the queue")
-            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+            .buckets(TIME_HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
         &["device", "optype"]
     ).expect("Couldn't set up queue time histogram");
 
     let h_disk_time = register_histogram_vec!(
         histogram_opts!("diskio_disk_time_seconds", "Time spent on the device")
-            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+            .buckets(TIME_HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
         &["device", "optype"]
     ).expect("Couldn't set up disk time histogram");
 
     let h_total_time = register_histogram_vec!(
         histogram_opts!("diskio_total_time_seconds", "Total time spent")
-            .buckets(HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+            .buckets(TIME_HISTOGRAM_BUCKETS.iter().map(|x| x / 1000.0).collect()),
+        &["device", "optype"]
+    ).expect("Couldn't set up total time histogram");
+
+    let h_queue_reqsz = register_histogram_vec!(
+        histogram_opts!("diskio_queued_request_size_bytes", "Request size in bytes when queued")
+            .buckets(SIZE_HISTOGRAM_BUCKETS.iter().map(|x| (*x as f64) * 1024.0).collect()),
+        &["device", "optype"]
+    ).expect("Couldn't set up total time histogram");
+
+    let h_disk_reqsz = register_histogram_vec!(
+        histogram_opts!("diskio_disk_request_size_bytes", "Request size in bytes when sent to disk")
+            .buckets(SIZE_HISTOGRAM_BUCKETS.iter().map(|x| (*x as f64) * 1024.0).collect()),
         &["device", "optype"]
     ).expect("Couldn't set up total time histogram");
 
@@ -233,19 +251,29 @@ fn run(port: u16) -> Result<()> {
                 match op {
                     "block_rq_insert" => {
                         // insert and issue ops have a request size field
-                        let _reqsz = words[7];
+                        let reqsz = words[7];
                         let sector = words[9];
                         let nr_sectors = words[11];
                         let event_key = format!("{},{},{}", dev, sector, nr_sectors);
                         insertions.insert(event_key, time);
+                        if let Ok(reqsz) = reqsz.parse() {
+                            h_queue_reqsz
+                                .with_label_values(&[&dev_path, optype])
+                                .observe(reqsz);
+                        }
                     },
                     "block_rq_issue" => {
                         // insert and issue ops have a request size field
-                        let _reqsz = words[7];
+                        let reqsz = words[7];
                         let sector = words[9];
                         let nr_sectors = words[11];
                         let event_key = format!("{},{},{}", dev, sector, nr_sectors);
                         issuances.insert(event_key, time);
+                        if let Ok(reqsz) = reqsz.parse() {
+                            h_disk_reqsz
+                                .with_label_values(&[&dev_path, optype])
+                                .observe(reqsz);
+                        }
                     },
                     "block_rq_complete" => {
                         // complete ops do not have the size field
