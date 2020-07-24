@@ -87,13 +87,13 @@ fn run(port: u16) -> Result<()> {
         histogram_opts!("diskio_queued_request_size_bytes", "Request size in bytes when queued")
             .buckets(SIZE_HISTOGRAM_BUCKETS.iter().map(|x| (*x as f64) * 1024.0).collect()),
         &["device", "optype"]
-    ).expect("Couldn't set up total time histogram");
+    ).expect("Couldn't set up queue request size histogram");
 
     let h_disk_reqsz = register_histogram_vec!(
         histogram_opts!("diskio_disk_request_size_bytes", "Request size in bytes when sent to disk")
             .buckets(SIZE_HISTOGRAM_BUCKETS.iter().map(|x| (*x as f64) * 1024.0).collect()),
         &["device", "optype"]
-    ).expect("Couldn't set up total time histogram");
+    ).expect("Couldn't set up disk request size histogram");
 
     let g_insertions_len = register_gauge!(
         "insertions_hashmap_len",
