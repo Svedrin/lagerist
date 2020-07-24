@@ -1,6 +1,6 @@
 [package]
 name = "lagerist"
-version = "0.1.5"
+version = "99.99.9"
 authors = ["Michael Ziegler <michael.ziegler@proemion.com>"]
 edition = "2018"
 

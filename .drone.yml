@@ -3,6 +3,15 @@ kind: pipeline
 name: default
 
 steps:
+- name: set version in Cargo.toml
+  image: rust:alpine
+  commands:
+  - echo "Setting Cargo.toml to version $DRONE_TAG:"
+  - sed -i -e "s/99\.99\.9/$(echo $DRONE_TAG | tr -d 'v')/" Cargo.toml
+  - cat Cargo.toml
+  when:
+    event: tag
+
 - name: build Rust version
   image: rust:alpine
   commands:
@@ -43,6 +52,6 @@ steps:
       - pull_request
 ---
 kind: signature
-hmac: f4c306be9f3da10954bf1b98577846e87c768bfb20986778f9eef0ebad4a08ab
+hmac: 1803e96c89318f604877c013907bfe34d50314a8f7dd16814adc69fe3330b415
 
 ...
