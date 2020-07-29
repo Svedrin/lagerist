@@ -84,7 +84,7 @@ fn run(port: u16) -> Result<()> {
     ).expect("Couldn't set up total time histogram");
 
     let h_queue_reqsz = register_histogram_vec!(
-        histogram_opts!("diskio_queued_request_size_bytes", "Request size in bytes when queued")
+        histogram_opts!("diskio_queue_request_size_bytes", "Request size in bytes when queued")
             .buckets(SIZE_HISTOGRAM_BUCKETS.iter().map(|x| (*x as f64) * 1024.0).collect()),
         &["device", "optype"]
     ).expect("Couldn't set up queue request size histogram");
