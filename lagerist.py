@@ -154,7 +154,7 @@ async def http_handler(server_stream):
         print("http_handler: crashed: {!r}".format(exc))
 
 async def httpd():
-    await trio.serve_tcp(http_handler, 9165)
+    await trio.serve_tcp(http_handler, 9789)
 
 async def async_main():
     async with trio.open_nursery() as nursery:

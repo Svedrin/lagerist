@@ -1,4 +1,4 @@
-# Lagerist
+# Lagerist Disk latency exporter
 
 Lagerist is a daemon that runs kernel traces to gather disk IO statistics, which
 are exposed as Histograms in the Prometheus format. The result, when graphed using
@@ -16,6 +16,6 @@ docker run -d --name lagerist \
     -v /proc:/proc \
     -v /dev:/dev:ro \
     -v /sys:/sys \
-    -p 9165:9165 \
+    -p 9789:9789 \
     svedrin/lagerist:latest
 ```
