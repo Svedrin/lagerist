@@ -47,11 +47,12 @@ steps:
       from_secret: docker-registry-pw
     cache_from: "svedrin/lagerist:latest"
   when:
+    branch: master
     event:
       exclude:
       - pull_request
 ---
 kind: signature
-hmac: 1803e96c89318f604877c013907bfe34d50314a8f7dd16814adc69fe3330b415
+hmac: 0ea67350f1e0503acd76453f439d2354559effd58d7157ff39fe301ebb7db242
 
 ...
