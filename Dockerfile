@@ -5,7 +5,7 @@ COPY target/release/lagerist /app/
 WORKDIR /app
 
 VOLUME ["/proc", "/sys", "/dev"]
-EXPOSE 9165
+EXPOSE 9789
 ENTRYPOINT ["dumb-init", "--"]
 CMD [ "/app/lagerist" ]
 

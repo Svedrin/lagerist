@@ -380,7 +380,7 @@ fn main() {
             .long("port")
             .takes_value(true)
             .help("Port number to use")
-            .default_value("9165")
+            .default_value("9789")
         )
         .get_matches();
 

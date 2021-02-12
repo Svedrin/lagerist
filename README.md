@@ -16,6 +16,6 @@ docker run -d --name lagerist \
     -v /proc:/proc \
     -v /dev:/dev:ro \
     -v /sys:/sys \
-    -p 9165:9165 \
+    -p 9789:9789 \
     svedrin/lagerist:latest
 ```
