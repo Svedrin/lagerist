@@ -71,16 +71,36 @@ impl DevicePaths {
         Ok(dev_path)
     }
 
-    pub fn get_dev_path(&mut self, dev: &str) -> String {
+    /// Remove all cache entries whose TTL has expired and return their device paths.
+    /// Callers should clean up associated Prometheus label sets for the returned paths.
+    pub fn cleanup(&mut self) -> Vec<String> {
+        let mut evicted = Vec::new();
+        self.cache.retain(|_, (path, inserted_at)| {
+            if inserted_at.elapsed() >= CACHE_TTL {
+                evicted.push(path.clone());
+                false
+            } else {
+                true
+            }
+        });
+        evicted
+    }
+
+    pub fn get_dev_path(&mut self, dev: &str) -> (String, Option<String>) {
         // Dev is a "major,minor" string
+        // Returns (current_path, evicted_old_path) where evicted_old_path is Some(old)
+        // when a stale cache entry was replaced with a different path, so the caller can
+        // clean up associated Prometheus label values for the old path.
         if let Some((path, inserted_at)) = self.cache.get(dev) {
             if inserted_at.elapsed() < CACHE_TTL {
-                return path.clone();
+                return (path.clone(), None);
             }
         }
+        let old_path = self.cache.remove(dev).map(|(p, _)| p);
         let path = self.resolve(dev).unwrap_or_else(|_| format!("dev:{}", dev));
         self.cache.insert(String::from(dev), (path.clone(), Instant::now()));
-        path
+        // Only signal eviction when the new path actually differs from the old one
+        let evicted = old_path.filter(|old| old != &path);
+        (path, evicted)
     }
 }
-
