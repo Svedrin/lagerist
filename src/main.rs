@@ -295,8 +295,17 @@ fn run(port: u16) -> Result<()> {
             if pollfds[idx + 2].revents & libc::POLLIN != 0 {
                 remove_indices.push(idx);
                 let mut data = [0u8; 16_384];
-                client.read(&mut data)
-                    .context("Could not read client data")?;
+                let n = match client.read(&mut data) {
+                    Ok(n) => n,
+                    Err(e) => {
+                        eprintln!("Could not read client data: {}", e);
+                        continue;
+                    }
+                };
+                if n == 0 {
+                    // Client disconnected before sending a request; skip response.
+                    continue;
+                }
 
                 // We don't really care for the request, we always respond with our data
                 let mut buffer = Vec::new();
@@ -310,7 +319,9 @@ fn run(port: u16) -> Result<()> {
                     body.len(),
                     body
                 );
-                client.write(response.as_bytes()).context("Could not send response to client")?;
+                if let Err(e) = client.write(response.as_bytes()) {
+                    eprintln!("Could not send response to client: {}", e);
+                }
             }
         }
         for idx in remove_indices.into_iter().rev() {
