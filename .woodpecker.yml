@@ -31,24 +31,23 @@ steps:
       - event: tag
 
   - name: build docker image
-    image: woodpeckerci/plugin-kaniko
+    image: woodpeckerci/plugin-docker-buildx
+    privileged: true
     settings:
-      registry: docker.io
       repo: svedrin/lagerist
       username: svedrin
       password:
         from_secret: docker-registry-pw
       tags: latest
-      cache: true
-      cache_repo: docker.funzt-halt.net/lagerist-cache
+      cache_from: svedrin/lagerist:latest
     when:
       - branch: master
         event: push
 
   - name: build and tag docker release
-    image: woodpeckerci/plugin-kaniko
+    image: woodpeckerci/plugin-docker-buildx
+    privileged: true
     settings:
-      registry: docker.io
       repo: svedrin/lagerist
       username: svedrin
       password:
@@ -56,7 +55,6 @@ steps:
       tags:
         - latest
         - ${CI_COMMIT_TAG}
-      cache: true
-      cache_repo: docker.funzt-halt.net/lagerist-cache
+      cache_from: svedrin/lagerist:latest
     when:
       - event: tag
