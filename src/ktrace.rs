@@ -1,14 +1,14 @@
 use std::fs::{create_dir,remove_dir,OpenOptions};
 use std::io::prelude::*;
-use super::errors::{Result, ResultExt};
+use anyhow::{Context, Result};
 
 fn echo_into(value: &[u8], path: &str) -> Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
         .open(&path)
-        .chain_err(|| format!("could not open {}", &path))?;
+        .with_context(|| format!("could not open {}", &path))?;
     file.write_all(value)
-        .chain_err(|| format!("could not write data to {}", &path))?;
+        .with_context(|| format!("could not write data to {}", &path))?;
     Ok(())
 }
 
@@ -31,7 +31,7 @@ pub fn setup() -> Result<()> {
                 Err(err)
             }
         )
-        .chain_err(|| "could not create ktrace instance")?;
+        .context("could not create ktrace instance")?;
     echo_into(b"1", &format!("{}/events/block/block_rq_issue/enable",    &instance_path))?;
     echo_into(b"1", &format!("{}/events/block/block_rq_insert/enable",   &instance_path))?;
     echo_into(b"1", &format!("{}/events/block/block_rq_complete/enable", &instance_path))?;
@@ -51,6 +51,6 @@ pub fn teardown() -> Result<()> {
     let instance_path = format!("/sys/kernel/debug/tracing/instances/{}", env!("CARGO_PKG_NAME"));
     echo_into(b"0", &format!("{}/tracing_on", &instance_path))?;
     remove_dir(&instance_path)
-        .chain_err(|| "could not remove ktrace instance")?;
+        .context("could not remove ktrace instance")?;
     Ok(())
 }

@@ -1,8 +1,3 @@
-extern crate clap;
-#[macro_use]
-extern crate error_chain;
-extern crate ctrlc;
-extern crate libc;
 #[macro_use]
 extern crate prometheus;
 
@@ -14,27 +9,16 @@ use std::ffi::CString;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
 use prometheus::{TextEncoder, Encoder};
-
-use clap::{Arg, App};
+use anyhow::{bail, Context, Result};
+use clap::{Arg, Command};
 
 mod ktrace;
 mod dev;
 
-mod errors {
-    error_chain! { }
-}
-
-use errors::*;
-
-fn print_error(msg: &str, e: &Error) {
+fn print_error(msg: &str, e: &anyhow::Error) {
     eprintln!("{}: {}", msg, e);
-
-    for e in e.iter().skip(1) {
-        eprintln!("caused by: {}", e);
-    }
-
-    if let Some(backtrace) = e.backtrace() {
-        eprintln!("backtrace: {:?}", backtrace);
+    for cause in e.chain().skip(1) {
+        eprintln!("caused by: {}", cause);
     }
 }
 
@@ -113,9 +97,9 @@ fn run(port: u16) -> Result<()> {
     };
 
     let listener = TcpListener::bind(format!(":::{}", port))
-        .chain_err(|| "Could not start server")?;
+        .context("Could not start server")?;
     listener.set_nonblocking(true)
-        .chain_err(|| "Could not set nonblocking")?;
+        .context("Could not set nonblocking")?;
 
     let mut clients = vec![];
 
@@ -322,7 +306,7 @@ fn run(port: u16) -> Result<()> {
                         break;
                     }
                     Err(e) => {
-                        Err(e).chain_err(|| "Could not accept client connection")?;
+                        Err(e).context("Could not accept client connection")?;
                     }
                 }
             }
@@ -338,7 +322,7 @@ fn run(port: u16) -> Result<()> {
                         remove_client = Some((client_fd_idx, client_idx));
                         let mut data = [0u8; 16_384];
                         client.read(&mut data)
-                            .chain_err(|| "Could not read client data")?;
+                            .context("Could not read client data")?;
 
                         // We don't really care for the request, we always respond with our data
                         let mut buffer = Vec::new();
@@ -351,7 +335,7 @@ fn run(port: u16) -> Result<()> {
                             output.len(),
                             output
                         );
-                        client.write(response.as_bytes()).chain_err(|| "Could not send response to client")?;
+                        client.write(response.as_bytes()).context("Could not send response to client")?;
                         break;
                     }
                 }
@@ -371,20 +355,19 @@ fn run(port: u16) -> Result<()> {
 }
 
 fn main() {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
+    let matches = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("Michael Ziegler <diese-addy@funzt-halt.net>")
         .about("disk IO metrics exporter")
-        .arg(Arg::with_name("port")
-            .short("p")
+        .arg(Arg::new("port")
+            .short('p')
             .long("port")
-            .takes_value(true)
             .help("Port number to use")
             .default_value("9789")
         )
         .get_matches();
 
-    let port = match matches.value_of("port").unwrap().parse::<u16>() {
+    let port = match matches.get_one::<String>("port").unwrap().parse::<u16>() {
         Err(_) => {
             eprintln!("Port argument must be a number between 1 and 65535");
             ::std::process::exit(2);
