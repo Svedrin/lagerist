@@ -37,18 +37,24 @@ impl DevicePaths {
         let mut dev_path = format!("/dev/{}", name);
 
         if name.starts_with("dm-") {
-            for path in fs::read_dir("/dev/mapper")? {
-                let link_target = fs::read_link(&path?.path().as_path())?;
-                if link_target.as_path() == Path::new(&dev_path) {
-                    let file_name = String::from(link_target.file_name().unwrap().to_string_lossy());
-                    if file_name.contains("-") {
-                        let parts: Vec<&str> = file_name.splitn(2, "-").collect();
+            for entry in fs::read_dir("/dev/mapper")? {
+                let entry = entry?;
+                let mapper_path = entry.path();
+                let resolved = match fs::canonicalize(&mapper_path) {
+                    Ok(p) => p,
+                    Err(_) => continue,
+                };
+                if resolved == Path::new(&dev_path) {
+                    let entry_name = String::from(entry.file_name().to_string_lossy());
+                    if entry_name.contains("-") {
+                        let parts: Vec<&str> = entry_name.splitn(2, "-").collect();
                         let vg = String::from(parts[0]);
                         let lv = String::from(parts[1]).replace("--", "-");
                         dev_path = format!("/dev/{}/{}", vg, lv);
                     } else {
-                        dev_path = String::from(link_target.to_string_lossy());
+                        dev_path = String::from(mapper_path.to_string_lossy());
                     }
+                    break;
                 }
             }
         }
