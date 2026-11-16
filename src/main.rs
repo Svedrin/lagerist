@@ -182,6 +182,9 @@ fn run(port: u16) -> Result<()> {
                 let mut start = None;
                 for (idx, word) in words.iter().enumerate() {
                     if word.starts_with("[") {
+                        if idx == 0 {
+                            break; // leave start as None → "can't find '['" error below
+                        }
                         start = Some(idx - 1);
                         break;
                     }
