@@ -321,10 +321,11 @@ fn run(port: u16) -> Result<()> {
                         let metric_families = prometheus::gather();
                         encoder.encode(&metric_families, &mut buffer).unwrap();
                         let output = String::from_utf8(buffer).unwrap();
+                        let body = format!("{}\n", output);
                         let response = format!(
-                            "HTTP/1.1 200 OK\nContent-Type: text/plain\nContent-Length: {}\n\n{}\n",
-                            output.len(),
-                            output
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                            body.len(),
+                            body
                         );
                         client.write(response.as_bytes()).context("Could not send response to client")?;
                         break;

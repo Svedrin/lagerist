@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::time::{Duration, Instant};
+
+const CACHE_TTL: Duration = Duration::from_secs(60);
 
 pub struct DevicePaths {
-    cache: HashMap<String, String>,
+    cache: HashMap<String, (String, Instant)>,
 }
 
 impl DevicePaths {
@@ -70,13 +73,14 @@ impl DevicePaths {
 
     pub fn get_dev_path(&mut self, dev: &str) -> String {
         // Dev is a "major,minor" string
-        if self.cache.contains_key(dev) {
-            self.cache.get(dev).unwrap().clone()
-        } else {
-            let path = self.resolve(dev).unwrap_or_else(|_| format!("dev:{}", dev));
-            self.cache.insert(String::from(dev), path.clone());
-            path
+        if let Some((path, inserted_at)) = self.cache.get(dev) {
+            if inserted_at.elapsed() < CACHE_TTL {
+                return path.clone();
+            }
         }
+        let path = self.resolve(dev).unwrap_or_else(|_| format!("dev:{}", dev));
+        self.cache.insert(String::from(dev), (path.clone(), Instant::now()));
+        path
     }
 }
 
