@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate prometheus;
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -8,7 +5,7 @@ use std::io::prelude::*;
 use std::ffi::CString;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
-use prometheus::{TextEncoder, Encoder};
+use prometheus::*;
 use anyhow::{bail, Context, Result};
 use clap::{Arg, Command};
 
@@ -153,7 +150,7 @@ fn run(port: u16) -> Result<()> {
                         libc::read(
                             trace_pipe_fd,
                             contents.as_mut_ptr().add(read_pos) as *mut libc::c_void,
-                            BUFSIZE - 1
+                            BUFSIZE - 1 - read_pos
                         ) as isize
                     };
                     if bytes_read == -1 {
@@ -191,7 +188,6 @@ fn run(port: u16) -> Result<()> {
                     continue;
                 }
                 let words = &words[start.unwrap()..];
-                //dbg!(words);
                 // Get time from words[3]
                 // Unfortunately there's a : at the end, so cut that away first
                 let time = match words[3][..words[3].len() -1].parse::<f64>() {
@@ -275,7 +271,6 @@ fn run(port: u16) -> Result<()> {
                         let queue_time = issuance - insertion;
                         let disk_time  = time - issuance;
                         let total_time = queue_time + disk_time;
-                        //dbg!(&dev_path, total_time);
                         h_queue_time.with_label_values(&[&dev_path, optype]).observe(queue_time);
                         h_disk_time.with_label_values(&[&dev_path, optype]).observe(disk_time);
                         h_total_time.with_label_values(&[&dev_path, optype]).observe(total_time);
@@ -289,10 +284,6 @@ fn run(port: u16) -> Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        /*if let Ok(addr) = stream.peer_addr() {
-                            dbg!(addr);
-                        }*/
-
                         pollfds.push(
                             libc::pollfd {
                                 fd: stream.as_raw_fd(),
@@ -312,14 +303,14 @@ fn run(port: u16) -> Result<()> {
             }
         }
         // Check any additional fds as client connections
-        let mut remove_client = None;
+        let mut remove_clients = Vec::new();
         for (client_fd_idx, client_fd) in pollfds.iter().enumerate().skip(2) {
             if client_fd.revents & libc::POLLIN != 0 {
                 // Find the TcpStream that this fd belongs to
                 for (client_idx, client) in clients.iter_mut().enumerate() {
                     if client.as_raw_fd() == client_fd.fd {
                         // Handle the request. We always use Connection:Close semantics because easier.
-                        remove_client = Some((client_fd_idx, client_idx));
+                        remove_clients.push((client_fd_idx, client_idx));
                         let mut data = [0u8; 16_384];
                         client.read(&mut data)
                             .context("Could not read client data")?;
@@ -341,7 +332,7 @@ fn run(port: u16) -> Result<()> {
                 }
             }
         }
-        if let Some((client_fd_idx, client_idx)) = remove_client.take() {
+        for (client_fd_idx, client_idx) in remove_clients.into_iter().rev() {
             pollfds.remove(client_fd_idx);
             clients.remove(client_idx);
         }
