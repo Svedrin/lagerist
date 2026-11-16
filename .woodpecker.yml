@@ -39,7 +39,7 @@ steps:
         from_secret: docker-registry-pw
       tags: latest
       cache: true
-      cache_repo: svedrin/lagerist-cache
+      cache_repo: docker.funzt-halt.net/lagerist-cache
     when:
       - branch: master
         event: push
@@ -55,6 +55,6 @@ steps:
         - latest
         - ${CI_COMMIT_TAG}
       cache: true
-      cache_repo: svedrin/lagerist-cache
+      cache_repo: docker.funzt-halt.net/lagerist-cache
     when:
       - event: tag
