@@ -208,6 +208,17 @@ fn run(port: u16) -> Result<()> {
                     next_cleanup = time + 600.0;
                     g_insertions_len.set(insertions.len() as f64);
                     g_issuances_len.set(issuances.len() as f64);
+                    // Purge DevicePaths cache entries that were never looked up again
+                    // after their TTL expired (e.g. a USB drive that was unplugged).
+                    for old_path in device_paths.cleanup() {
+                        for ot in &["read", "write"] {
+                            let _ = h_queue_time.remove_label_values(&[&old_path, ot]);
+                            let _ = h_disk_time.remove_label_values(&[&old_path, ot]);
+                            let _ = h_total_time.remove_label_values(&[&old_path, ot]);
+                            let _ = h_queue_reqsz.remove_label_values(&[&old_path, ot]);
+                            let _ = h_disk_reqsz.remove_label_values(&[&old_path, ot]);
+                        }
+                    }
                 }
 
                 let optype =

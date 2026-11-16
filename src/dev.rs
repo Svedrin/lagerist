@@ -71,6 +71,20 @@ impl DevicePaths {
         Ok(dev_path)
     }
 
+    pub fn cleanup(&mut self) -> Vec<String> {
+        let mut evicted = Vec::new();
+        self.cache.retain(|_, (path, inserted_at)| {
+            if inserted_at.elapsed() >= CACHE_TTL {
+                evicted.push(path.clone());
+                false
+            } else {
+                true
+            }
+        });
+        evicted
+    }
+
+
     pub fn get_dev_path(&mut self, dev: &str) -> (String, Option<String>) {
         // Dev is a "major,minor" string
         // Returns (current_path, evicted_old_path) where evicted_old_path is Some(old)
@@ -89,4 +103,3 @@ impl DevicePaths {
         (path, evicted)
     }
 }
-
