@@ -4,15 +4,12 @@ use std::path::Path;
 
 pub struct DevicePaths {
     cache: HashMap<String, String>,
-    proc_partitions: String
 }
 
 impl DevicePaths {
     pub fn new() -> Self {
         Self {
             cache: HashMap::new(),
-            proc_partitions: fs::read_to_string("/proc/partitions")
-                .expect("cannot read /proc/partitions")
         }
     }
 
@@ -26,14 +23,20 @@ impl DevicePaths {
             return Ok(format!("/dev/loop{}", minor));
         }
 
-        for line in self.proc_partitions.lines().skip(2) {
+        let proc_partitions = fs::read_to_string("/proc/partitions")?;
+        for line in proc_partitions.lines().skip(2) {
             let fields: Vec<&str> = line.split_ascii_whitespace().collect();
             if fields[0] == major && fields[1] == minor {
                 name = Some(fields[3].clone());
             }
         }
-        let name = name
-            .expect(&format!("Device with no name: {}", dev));
+        let name = match name {
+            Some(n) => n,
+            None => return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Device with no name: {}", dev),
+            )),
+        };
         let mut dev_path = format!("/dev/{}", name);
 
         if name.starts_with("dm-") {
@@ -47,10 +50,14 @@ impl DevicePaths {
                 if resolved == Path::new(&dev_path) {
                     let entry_name = String::from(entry.file_name().to_string_lossy());
                     if entry_name.contains("-") {
-                        let parts: Vec<&str> = entry_name.splitn(2, "-").collect();
-                        let vg = String::from(parts[0]);
-                        let lv = String::from(parts[1]).replace("--", "-");
-                        dev_path = format!("/dev/{}/{}", vg, lv);
+                        let placeholder = "\x00";
+                        let escaped = entry_name.replace("--", placeholder);
+                        let parts: Vec<&str> = escaped.splitn(2, "-").collect();
+                        if parts.len() == 2 {
+                            let vg = parts[0].replace(placeholder, "-");
+                            let lv = parts[1].replace(placeholder, "-");
+                            dev_path = format!("/dev/{}/{}", vg, lv);
+                        }
                     } else {
                         dev_path = String::from(mapper_path.to_string_lossy());
                     }
@@ -66,7 +73,7 @@ impl DevicePaths {
         if self.cache.contains_key(dev) {
             self.cache.get(dev).unwrap().clone()
         } else {
-            let path = self.resolve(dev).expect("couldn't find name for device");
+            let path = self.resolve(dev).unwrap_or_else(|_| format!("dev:{}", dev));
             self.cache.insert(String::from(dev), path.clone());
             path
         }
