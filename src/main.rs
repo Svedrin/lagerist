@@ -219,7 +219,21 @@ fn run(port: u16) -> Result<()> {
                         continue;
                     };
 
-                let dev_path = device_paths.get_dev_path(dev);
+                let (dev_path, evicted_path) = device_paths.get_dev_path(dev);
+
+                // If the device-path cache replaced a stale entry, remove the old
+                // label-value sets from all five HistogramVecs so they don't accumulate
+                // forever (the main source of cardinality growth on container hosts with
+                // transient loop devices).
+                if let Some(ref old_path) = evicted_path {
+                    for ot in &["read", "write"] {
+                        let _ = h_queue_time.remove_label_values(&[old_path, ot]);
+                        let _ = h_disk_time.remove_label_values(&[old_path, ot]);
+                        let _ = h_total_time.remove_label_values(&[old_path, ot]);
+                        let _ = h_queue_reqsz.remove_label_values(&[old_path, ot]);
+                        let _ = h_disk_reqsz.remove_label_values(&[old_path, ot]);
+                    }
+                }
 
                 match op {
                     "block_rq_insert" => {
