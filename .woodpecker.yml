@@ -13,7 +13,10 @@ steps:
     commands:
       - apk add --no-cache musl-dev
       - cargo build --release
-      - echo -n "latest" > .tags
+    when:
+      - branch: master
+        event: push
+      - event: tag
 
   - name: publish
     image: plugins/github-release
@@ -27,21 +30,31 @@ steps:
     when:
       - event: tag
 
-  - name: set version tag
-    image: alpine:latest
-    commands:
-      - echo -n ",${CI_COMMIT_TAG}" >> .tags
-    when:
-      - event: tag
-
   - name: build docker image
-    image: plugins/docker
+    image: woodpeckerci/plugin-kaniko
     settings:
       repo: svedrin/lagerist
       username: svedrin
       password:
         from_secret: docker-registry-pw
-      cache_from: "svedrin/lagerist:latest"
+      tags: latest
+      cache: true
+      cache_repo: svedrin/lagerist-cache
     when:
       - branch: master
         event: push
+
+  - name: build and tag docker release
+    image: woodpeckerci/plugin-kaniko
+    settings:
+      repo: svedrin/lagerist
+      username: svedrin
+      password:
+        from_secret: docker-registry-pw
+      tags:
+        - latest
+        - ${CI_COMMIT_TAG}
+      cache: true
+      cache_repo: svedrin/lagerist-cache
+    when:
+      - event: tag
