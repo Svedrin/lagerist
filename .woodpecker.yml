@@ -1,0 +1,47 @@
+steps:
+  - name: set version in Cargo.toml
+    image: rust:alpine
+    commands:
+      - echo "Setting Cargo.toml to version $CI_COMMIT_TAG:"
+      - sed -i -e "s/99\.99\.9/$(echo $CI_COMMIT_TAG | tr -d 'v')/" Cargo.toml
+      - cat Cargo.toml
+    when:
+      - event: tag
+
+  - name: build
+    image: rust:alpine
+    commands:
+      - apk add --no-cache musl-dev
+      - cargo build --release
+      - echo -n "latest" > .tags
+
+  - name: publish
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github-token
+      files:
+        - target/release/lagerist
+      checksum:
+        - sha256
+    when:
+      - event: tag
+
+  - name: set version tag
+    image: alpine:latest
+    commands:
+      - echo -n ",${CI_COMMIT_TAG}" >> .tags
+    when:
+      - event: tag
+
+  - name: build docker image
+    image: plugins/docker
+    settings:
+      repo: svedrin/lagerist
+      username: svedrin
+      password:
+        from_secret: docker-registry-pw
+      cache_from: "svedrin/lagerist:latest"
+    when:
+      - branch: master
+        event: push
