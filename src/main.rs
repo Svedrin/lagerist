@@ -5,6 +5,7 @@ use std::io::prelude::*;
 use std::ffi::CString;
 use std::net::TcpListener;
 use std::os::unix::io::AsRawFd;
+use std::time::{Duration, Instant};
 use prometheus::*;
 use anyhow::{bail, Context, Result};
 use clap::{Arg, Command};
@@ -98,7 +99,7 @@ fn run(port: u16) -> Result<()> {
     listener.set_nonblocking(true)
         .context("Could not set nonblocking")?;
 
-    let mut clients: Vec<std::net::TcpStream> = vec![];
+    let mut clients: Vec<(std::net::TcpStream, Instant)> = vec![];
 
     let mut contents = vec![0u8; BUFSIZE];
 
@@ -113,7 +114,7 @@ fn run(port: u16) -> Result<()> {
             libc::pollfd { fd: trace_pipe_fd,          events: libc::POLLIN, revents: 0 },
             libc::pollfd { fd: listener.as_raw_fd(),   events: libc::POLLIN, revents: 0 },
         ];
-        for stream in &clients {
+        for (stream, _) in &clients {
             pollfds.push(libc::pollfd { fd: stream.as_raw_fd(), events: libc::POLLIN, revents: 0 });
         }
         let poll_result = unsafe {
@@ -277,7 +278,7 @@ fn run(port: u16) -> Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        clients.push(stream);
+                        clients.push((stream, Instant::now()));
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         break;
@@ -291,7 +292,7 @@ fn run(port: u16) -> Result<()> {
         // Check any additional fds as client connections.
         // clients[i] always corresponds to pollfds[i + 2] by construction above.
         let mut remove_indices = Vec::new();
-        for (idx, client) in clients.iter_mut().enumerate() {
+        for (idx, (client, connected_at)) in clients.iter_mut().enumerate() {
             if pollfds[idx + 2].revents & libc::POLLIN != 0 {
                 remove_indices.push(idx);
                 let mut data = [0u8; 16_384];
@@ -311,6 +312,9 @@ fn run(port: u16) -> Result<()> {
                     body
                 );
                 client.write(response.as_bytes()).context("Could not send response to client")?;
+            } else if connected_at.elapsed() >= Duration::from_secs(10) {
+                // Client connected but sent nothing for 10 s; evict it.
+                remove_indices.push(idx);
             }
         }
         for idx in remove_indices.into_iter().rev() {
