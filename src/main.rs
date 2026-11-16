@@ -98,21 +98,7 @@ fn run(port: u16) -> Result<()> {
     listener.set_nonblocking(true)
         .context("Could not set nonblocking")?;
 
-    let mut clients = vec![];
-
-    let mut pollfds = vec![
-        libc::pollfd {
-            //fd:      stream.as_raw_fd(),
-            fd:      trace_pipe_fd,
-            events:  libc::POLLIN,
-            revents: 0
-        },
-        libc::pollfd {
-            fd:      listener.as_raw_fd(),
-            events:  libc::POLLIN,
-            revents: 0
-        }
-    ];
+    let mut clients: Vec<std::net::TcpStream> = vec![];
 
     let mut contents = vec![0u8; BUFSIZE];
 
@@ -123,9 +109,16 @@ fn run(port: u16) -> Result<()> {
     let mut next_cleanup = 0.0;
 
     while running.load(Ordering::SeqCst) {
+        let mut pollfds: Vec<libc::pollfd> = vec![
+            libc::pollfd { fd: trace_pipe_fd,          events: libc::POLLIN, revents: 0 },
+            libc::pollfd { fd: listener.as_raw_fd(),   events: libc::POLLIN, revents: 0 },
+        ];
+        for stream in &clients {
+            pollfds.push(libc::pollfd { fd: stream.as_raw_fd(), events: libc::POLLIN, revents: 0 });
+        }
         let poll_result = unsafe {
             libc::poll(
-                &mut pollfds[0] as *mut libc::pollfd,
+                pollfds.as_mut_ptr(),
                 pollfds.len() as u64,
                 100
             )
@@ -284,13 +277,6 @@ fn run(port: u16) -> Result<()> {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        pollfds.push(
-                            libc::pollfd {
-                                fd: stream.as_raw_fd(),
-                                events: libc::POLLIN,
-                                revents: 0
-                            }
-                        );
                         clients.push(stream);
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -302,40 +288,33 @@ fn run(port: u16) -> Result<()> {
                 }
             }
         }
-        // Check any additional fds as client connections
-        let mut remove_clients = Vec::new();
-        for (client_fd_idx, client_fd) in pollfds.iter().enumerate().skip(2) {
-            if client_fd.revents & libc::POLLIN != 0 {
-                // Find the TcpStream that this fd belongs to
-                for (client_idx, client) in clients.iter_mut().enumerate() {
-                    if client.as_raw_fd() == client_fd.fd {
-                        // Handle the request. We always use Connection:Close semantics because easier.
-                        remove_clients.push((client_fd_idx, client_idx));
-                        let mut data = [0u8; 16_384];
-                        client.read(&mut data)
-                            .context("Could not read client data")?;
+        // Check any additional fds as client connections.
+        // clients[i] always corresponds to pollfds[i + 2] by construction above.
+        let mut remove_indices = Vec::new();
+        for (idx, client) in clients.iter_mut().enumerate() {
+            if pollfds[idx + 2].revents & libc::POLLIN != 0 {
+                remove_indices.push(idx);
+                let mut data = [0u8; 16_384];
+                client.read(&mut data)
+                    .context("Could not read client data")?;
 
-                        // We don't really care for the request, we always respond with our data
-                        let mut buffer = Vec::new();
-                        let encoder = TextEncoder::new();
-                        let metric_families = prometheus::gather();
-                        encoder.encode(&metric_families, &mut buffer).unwrap();
-                        let output = String::from_utf8(buffer).unwrap();
-                        let body = format!("{}\n", output);
-                        let response = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
-                            body.len(),
-                            body
-                        );
-                        client.write(response.as_bytes()).context("Could not send response to client")?;
-                        break;
-                    }
-                }
+                // We don't really care for the request, we always respond with our data
+                let mut buffer = Vec::new();
+                let encoder = TextEncoder::new();
+                let metric_families = prometheus::gather();
+                encoder.encode(&metric_families, &mut buffer).unwrap();
+                let output = String::from_utf8(buffer).unwrap();
+                let body = format!("{}\n", output);
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                client.write(response.as_bytes()).context("Could not send response to client")?;
             }
         }
-        for (client_fd_idx, client_idx) in remove_clients.into_iter().rev() {
-            pollfds.remove(client_fd_idx);
-            clients.remove(client_idx);
+        for idx in remove_indices.into_iter().rev() {
+            clients.remove(idx);
         }
     }
 
