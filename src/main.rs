@@ -108,13 +108,22 @@ fn run(port: u16) -> Result<()> {
 
     let mut next_cleanup = 0.0;
 
+    let mut pollfds: Vec<libc::pollfd> = Vec::new();
+    let mut pollfds_dirty = true;
+
     while running.load(Ordering::SeqCst) {
-        let mut pollfds: Vec<libc::pollfd> = vec![
-            libc::pollfd { fd: trace_pipe_fd,          events: libc::POLLIN, revents: 0 },
-            libc::pollfd { fd: listener.as_raw_fd(),   events: libc::POLLIN, revents: 0 },
-        ];
-        for stream in &clients {
-            pollfds.push(libc::pollfd { fd: stream.as_raw_fd(), events: libc::POLLIN, revents: 0 });
+        if pollfds_dirty {
+            pollfds = vec![
+                libc::pollfd { fd: trace_pipe_fd,          events: libc::POLLIN, revents: 0 },
+                libc::pollfd { fd: listener.as_raw_fd(),   events: libc::POLLIN, revents: 0 },
+            ];
+            for stream in &clients {
+                pollfds.push(libc::pollfd { fd: stream.as_raw_fd(), events: libc::POLLIN, revents: 0 });
+            }
+            pollfds_dirty = false;
+        }
+        for pfd in &mut pollfds {
+            pfd.revents = 0;
         }
         let poll_result = unsafe {
             libc::poll(
@@ -278,6 +287,7 @@ fn run(port: u16) -> Result<()> {
                 match stream {
                     Ok(stream) => {
                         clients.push(stream);
+                        pollfds_dirty = true;
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         break;
@@ -313,8 +323,11 @@ fn run(port: u16) -> Result<()> {
                 client.write(response.as_bytes()).context("Could not send response to client")?;
             }
         }
-        for idx in remove_indices.into_iter().rev() {
-            clients.remove(idx);
+        if !remove_indices.is_empty() {
+            for idx in remove_indices.into_iter().rev() {
+                clients.remove(idx);
+            }
+            pollfds_dirty = true;
         }
     }
 
