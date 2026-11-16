@@ -33,7 +33,7 @@ steps:
   - name: build docker image
     image: woodpeckerci/plugin-kaniko
     settings:
-      registry: index.docker.io
+      registry: docker.io
       repo: svedrin/lagerist
       username: svedrin
       password:
@@ -48,7 +48,7 @@ steps:
   - name: build and tag docker release
     image: woodpeckerci/plugin-kaniko
     settings:
-      registry: index.docker.io
+      registry: docker.io
       repo: svedrin/lagerist
       username: svedrin
       password:
