@@ -329,8 +329,10 @@ fn run(port: u16) -> Result<()> {
         }
         // Check any additional fds as client connections.
         // clients[i] always corresponds to pollfds[i + 2] by construction above.
+        // Clients added this iteration (after poll) are not in pollfds yet; skip them.
+        let polled_client_count = pollfds.len().saturating_sub(2);
         let mut remove_indices = Vec::new();
-        for (idx, (client, connected_at)) in clients.iter_mut().enumerate() {
+        for (idx, (client, connected_at)) in clients[..polled_client_count].iter_mut().enumerate() {
             if pollfds[idx + 2].revents & libc::POLLIN != 0 {
                 remove_indices.push(idx);
                 let mut data = [0u8; 16_384];
